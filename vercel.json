@@ -4,11 +4,9 @@
   "outputDirectory": "dist",
   "functions": {
     "api/gifts/decide.ts": {
-      "includeFiles": "server-lib.ts",
       "maxDuration": 60
     },
     "api/image-proxy.ts": {
-      "includeFiles": "server-lib.ts",
       "maxDuration": 15
     }
   },

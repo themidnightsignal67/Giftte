@@ -1,2 +1,2 @@
-/** Re-export shared helpers from repo root for any legacy imports. */
-export * from '../../server-lib';
+/** Shared helpers live in ./server-lib (inside api/ so Vercel always bundles them). */
+export * from './server-lib';
