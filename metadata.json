@@ -1,0 +1,6 @@
+{
+  "name": "giftte",
+  "description": "Thoughtful gift decision studio — narrow down curated, tactile gifts by recipient, occasion, temperament, and budget, compare finalists side by side, and save gift lists with Google Sign-In.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

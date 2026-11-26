@@ -1,0 +1,223 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRecipientList(data, userId, recipientId) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'relationship', 'occasion', 'budgetMax', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'name', 'relationship', 'occasion', 'budgetMax', 'notes', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == recipientId
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.relationship is string && data.relationship.size() >= 1 && data.relationship.size() <= 50
+        && data.occasion is string && data.occasion.size() >= 1 && data.occasion.size() <= 50
+        && data.budgetMax is number && data.budgetMax >= 50 && data.budgetMax <= 1000000
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 300))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSavedGift(data, userId, savedGiftId) {
+      return data.keys().hasAll(['id', 'ownerId', 'giftId', 'recipientId', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'giftId', 'recipientId', 'recipientName', 'status', 'personalNote', 'cardMessage', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == savedGiftId
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && isValidId(data.giftId) && data.giftId.size() <= 80
+        && isValidId(data.recipientId)
+        && (!('recipientName' in data) || (data.recipientName is string && data.recipientName.size() <= 80))
+        && data.status in ['Shortlisted', 'Decided', 'Purchased']
+        && (!('personalNote' in data) || (data.personalNote is string && data.personalNote.size() <= 300))
+        && (!('cardMessage' in data) || (data.cardMessage is string && data.cardMessage.size() <= 400))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAiPick(data, userId, pickId) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'category', 'estimatedPriceInr', 'whyItFits', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'title', 'category', 'estimatedPriceInr', 'whyItFits', 'cardNote', 'recipientContext', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == pickId
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && data.estimatedPriceInr is string && data.estimatedPriceInr.size() >= 1 && data.estimatedPriceInr.size() <= 60
+        && data.whyItFits is string && data.whyItFits.size() >= 1 && data.whyItFits.size() <= 500
+        && (!('cardNote' in data) || (data.cardNote is string && data.cardNote.size() <= 400))
+        && (!('recipientContext' in data) || (data.recipientContext is string && data.recipientContext.size() <= 120))
+        && data.status in ['Shortlisted', 'Decided', 'Purchased']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDecisionSnapshot(data, userId, decisionId) {
+      return data.keys().hasAll(['id', 'ownerId', 'recipientType', 'occasion', 'interest', 'budgetTier', 'vibe', 'topGiftIds', 'createdAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'recipientType', 'occasion', 'interest', 'budgetTier', 'vibe', 'topGiftIds', 'createdAt'])
+        && isValidId(data.id)
+        && data.id == decisionId
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.recipientType is string && data.recipientType.size() >= 1 && data.recipientType.size() <= 50
+        && data.occasion is string && data.occasion.size() >= 1 && data.occasion.size() <= 50
+        && data.interest is string && data.interest.size() >= 1 && data.interest.size() <= 120
+        && data.budgetTier is string && data.budgetTier.size() >= 1 && data.budgetTier.size() <= 60
+        && data.vibe is string && data.vibe.size() >= 1 && data.vibe.size() <= 60
+        && data.topGiftIds is list && data.topGiftIds.size() >= 1 && data.topGiftIds.size() <= 3
+        && data.topGiftIds[0] is string && data.topGiftIds[0].size() >= 1 && data.topGiftIds[0].size() <= 80
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoURL', 'updatedAt']);
+      allow delete: if isValidId(userId) && isOwner(userId);
+
+      match /recipients/{recipientId} {
+        allow get: if isValidId(userId) && isValidId(recipientId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(recipientId)
+          && isOwner(userId)
+          && isValidRecipientList(incoming(), userId, recipientId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isValidId(userId)
+          && isValidId(recipientId)
+          && isOwner(userId)
+          && isValidRecipientList(incoming(), userId, recipientId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'relationship', 'occasion', 'budgetMax', 'notes', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(recipientId) && isOwner(userId);
+      }
+
+      match /savedGifts/{savedGiftId} {
+        allow get: if isValidId(userId) && isValidId(savedGiftId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(savedGiftId)
+          && isOwner(userId)
+          && isValidSavedGift(incoming(), userId, savedGiftId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && (incoming().recipientId == 'general' || exists(/databases/$(database)/documents/users/$(userId)/recipients/$(incoming().recipientId)));
+        allow update: if isValidId(userId)
+          && isValidId(savedGiftId)
+          && isOwner(userId)
+          && isValidSavedGift(incoming(), userId, savedGiftId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().giftId == existing().giftId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (incoming().recipientId == 'general' || exists(/databases/$(database)/documents/users/$(userId)/recipients/$(incoming().recipientId)))
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['personalNote', 'cardMessage', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['recipientId', 'recipientName', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          );
+        allow delete: if isValidId(userId) && isValidId(savedGiftId) && isOwner(userId);
+      }
+
+      match /aiPicks/{pickId} {
+        allow get: if isValidId(userId) && isValidId(pickId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(pickId)
+          && isOwner(userId)
+          && isValidAiPick(incoming(), userId, pickId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isValidId(userId)
+          && isValidId(pickId)
+          && isOwner(userId)
+          && isValidAiPick(incoming(), userId, pickId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(pickId) && isOwner(userId);
+      }
+
+      match /decisions/{decisionId} {
+        allow get: if isValidId(userId) && isValidId(decisionId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(decisionId)
+          && isOwner(userId)
+          && isValidDecisionSnapshot(incoming(), userId, decisionId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(decisionId) && isOwner(userId);
+      }
+    }
+  }
+}

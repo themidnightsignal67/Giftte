@@ -1,0 +1,271 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile storing private account details.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "RecipientList": {
+      "title": "RecipientList",
+      "description": "A person and occasion the user is actively shopping or deciding gifts for (budget in INR).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "relationship": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "occasion": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "budgetMax": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "name", "relationship", "occasion", "budgetMax", "createdAt", "updatedAt"]
+    },
+    "SavedGift": {
+      "title": "SavedGift",
+      "description": "A catalog gift saved to the user's vault, optionally linked to a recipient list.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "giftId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recipientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recipientName": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Shortlisted", "Decided", "Purchased"]
+        },
+        "personalNote": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "cardMessage": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "giftId", "recipientId", "status", "createdAt", "updatedAt"]
+    },
+    "AiGiftPick": {
+      "title": "AiGiftPick",
+      "description": "An AI-generated custom gift recommendation saved by the user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "estimatedPriceInr": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "whyItFits": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "cardNote": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "recipientContext": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Shortlisted", "Decided", "Purchased"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "title", "category", "estimatedPriceInr", "whyItFits", "status", "createdAt", "updatedAt"]
+    },
+    "DecisionSnapshot": {
+      "title": "DecisionSnapshot",
+      "description": "A recorded gift decision run from the Giftte AI Decider.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recipientType": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "occasion": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "interest": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "budgetTier": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "vibe": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "topGiftIds": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "recipientType", "occasion", "interest", "budgetTier", "vibe", "topGiftIds", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user account profile owned by userId."
+    },
+    "/users/{userId}/recipients/{recipientId}": {
+      "schema": { "$ref": "#/entities/RecipientList" },
+      "description": "Recipient gift lists created and owned by userId."
+    },
+    "/users/{userId}/savedGifts/{savedGiftId}": {
+      "schema": { "$ref": "#/entities/SavedGift" },
+      "description": "Saved catalog gifts and notes owned by userId."
+    },
+    "/users/{userId}/aiPicks/{pickId}": {
+      "schema": { "$ref": "#/entities/AiGiftPick" },
+      "description": "Saved AI-generated gift recommendations owned by userId."
+    },
+    "/users/{userId}/decisions/{decisionId}": {
+      "schema": { "$ref": "#/entities/DecisionSnapshot" },
+      "description": "Saved gift finder decision runs owned by userId."
+    }
+  }
+}
