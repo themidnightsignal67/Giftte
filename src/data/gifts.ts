@@ -171,6 +171,24 @@ export function isSafeHttpUrl(url?: string): url is string {
   return url.startsWith('https://') || url.startsWith('http://');
 }
 
+/** Turn any thrown value / API error field into a readable string (never "[object Object]"). */
+function toErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (value instanceof Error && value.message) return value.message;
+  if (value && typeof value === 'object') {
+    const rec = value as Record<string, unknown>;
+    if (typeof rec.error === 'string' && rec.error.trim()) return rec.error.trim();
+    if (typeof rec.message === 'string' && rec.message.trim()) return rec.message.trim();
+    try {
+      const json = JSON.stringify(value);
+      if (json && json !== '{}' && json !== 'null') return json.slice(0, 280);
+    } catch {
+      // ignore
+    }
+  }
+  return fallback;
+}
+
 export async function fetchLiveAiGiftRecommendations(
   payload: Partial<FinderQuery> & { searchQuery?: string }
 ): Promise<LiveAiDecisionResponse> {
@@ -190,11 +208,16 @@ export async function fetchLiveAiGiftRecommendations(
       });
 
       const rawText = await res.text();
-      let parsed: (Partial<LiveAiDecisionResponse> & { error?: string; gifts?: FinderRecommendation[] }) | null = null;
+      let parsed: (Partial<LiveAiDecisionResponse> & {
+        error?: unknown;
+        gifts?: FinderRecommendation[];
+        message?: unknown;
+      }) | null = null;
       try {
         parsed = JSON.parse(rawText) as Partial<LiveAiDecisionResponse> & {
-          error?: string;
+          error?: unknown;
           gifts?: FinderRecommendation[];
+          message?: unknown;
         };
       } catch {
         parsed = null;
@@ -206,8 +229,10 @@ export async function fetchLiveAiGiftRecommendations(
           continue;
         }
         throw new Error(
-          parsed?.error ||
+          toErrorMessage(
+            parsed?.error ?? parsed?.message,
             `giftte Intelligence returned status ${res.status}. Please tap Retry.`
+          )
         );
       }
 
@@ -224,8 +249,11 @@ export async function fetchLiveAiGiftRecommendations(
         }
         throw new Error(
           rawText.trimStart().startsWith('<')
-            ? 'giftte Intelligence could not reach the live curation server. Make sure the Node server is running with GEMINI_API_KEY set, then tap Retry.'
-            : 'Unexpected response format from giftte Intelligence. Please tap Retry.'
+            ? 'giftte Intelligence could not reach the live curation server. Set GEMINI_API_KEYS in Vercel Environment Variables, redeploy, then tap Retry.'
+            : toErrorMessage(
+                parsed?.error,
+                'Unexpected response format from giftte Intelligence. Please tap Retry.'
+              )
         );
       }
 
@@ -240,12 +268,10 @@ export async function fetchLiveAiGiftRecommendations(
         throw new Error('Request timed out while loading gifts. Please tap Retry.');
       }
       if (attempt === 2) {
-        throw err instanceof Error
-          ? err
-          : new Error('Unable to generate giftte Intelligence suggestions.');
+        throw new Error(toErrorMessage(err, 'Unable to generate giftte Intelligence suggestions.'));
       }
-      if (err instanceof Error && !err.message.includes('status 429')) {
-        throw err;
+      if (err instanceof Error && !err.message.includes('status 429') && !err.message.includes('rate limit')) {
+        throw new Error(toErrorMessage(err, 'Unable to generate giftte Intelligence suggestions.'));
       }
     } finally {
       window.clearTimeout(timeoutId);

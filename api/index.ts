@@ -1,12 +1,9 @@
 /**
  * Vercel serverless entry for giftte API routes.
- * All /api/* traffic is rewritten here (see vercel.json).
- *
- * Set GEMINI_API_KEYS (comma-separated) in Vercel Project Settings → Environment Variables.
+ * Set GEMINI_API_KEYS in Vercel → Settings → Environment Variables.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Lazy-init so cold starts only pay once per isolate
 let appPromise: Promise<import('express').Express> | null = null;
 
 async function getApp() {
@@ -20,12 +17,24 @@ async function getApp() {
 }
 
 export const config = {
-  // Gemini curation can take several seconds; raise on Pro if needed
   maxDuration: 60,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const app = await getApp();
-  // Express apps are request listeners — pass through
-  return app(req as unknown as import('express').Request, res as unknown as import('express').Response);
+  try {
+    const app = await getApp();
+    return await new Promise<void>((resolve) => {
+      const done = () => resolve();
+      res.on('finish', done);
+      res.on('close', done);
+      app(req as unknown as import('express').Request, res as unknown as import('express').Response);
+    });
+  } catch (err) {
+    console.error('[giftte] serverless handler error:', err);
+    const message =
+      err instanceof Error ? err.message : 'giftte Intelligence server failed to start.';
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
+    }
+  }
 }
