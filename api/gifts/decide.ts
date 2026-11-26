@@ -11,7 +11,7 @@ import {
   isRotatableKeyError,
   type DecidePayload,
   type RawAiGift,
-} from '../lib/helpers';
+} from '../../server-lib';
 
 export const config = { maxDuration: 60 };
 
