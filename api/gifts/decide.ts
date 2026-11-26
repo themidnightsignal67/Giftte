@@ -11,7 +11,7 @@ import {
   isRotatableKeyError,
   type DecidePayload,
   type RawAiGift,
-} from '../../server-lib';
+} from '../lib/server-lib';
 
 export const config = { maxDuration: 60 };
 
@@ -250,7 +250,7 @@ Keep each "searchQuery" crisp (3-5 words of exact brand + product name) so produ
       return;
     }
     res.status(500).json({
-      error: 'Unable to fetch giftte Intelligence picks right now. Please try again.',
+      error: msg || 'Unable to fetch giftte Intelligence picks right now. Please try again.',
     });
   }
 }
