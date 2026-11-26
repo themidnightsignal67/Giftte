@@ -1,7 +1,6 @@
-import 'dotenv/config';
 import dns from 'node:dns/promises';
 import net from 'node:net';
-import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 export interface DecidePayload {
   relationship?: unknown;
@@ -213,19 +212,6 @@ export async function searchProductImagesFast(queryText: string): Promise<ImageC
     }
   }
 
-  if (!primary) {
-    const altMatches = html.matchAll(/\"murl\":\"(https?:\/\/[^\"]+)\"/gi);
-    for (const match of altMatches) {
-      const raw = match[1] ? cleanHtmlUrl(match[1]) : '';
-      if (!raw) continue;
-      const valid = await assertPublicHttpUrl(raw);
-      if (valid && isLikelyUsefulImageUrl(valid.toString())) {
-        primary = valid.toString();
-        break;
-      }
-    }
-  }
-
   if (primary) return { primary, fallback };
   if (fallback) return { primary: fallback };
   return null;
@@ -290,18 +276,7 @@ export function extractJsonArrayOrObject(rawText: string): {
     }
   }
 
-  const recovered: RawAiGift[] = [];
-  const objMatches = cleaned.matchAll(/\{[^{}]*\"name\"\s*:\s*\"[^\"]+\"[^{}]*\}/g);
-  for (const m of objMatches) {
-    try {
-      const item = JSON.parse(m[0]) as RawAiGift;
-      if (item && item.name) recovered.push(item);
-    } catch {
-      // Ignore
-    }
-  }
-
-  return { gifts: recovered };
+  return { gifts: [] };
 }
 
 export function buildShoppingSearchUrl(name: string, maker: string): string {
@@ -389,14 +364,7 @@ export const GIFT_RESPONSE_SCHEMA = {
           keepsakeScore: { type: Type.NUMBER },
           unwrapScore: { type: Type.NUMBER },
         },
-        required: [
-          'name',
-          'maker',
-          'priceInr',
-          'searchQuery',
-          'whyItFits',
-          'customCardNote',
-        ],
+        required: ['name', 'maker', 'priceInr', 'searchQuery', 'whyItFits', 'customCardNote'],
       },
     },
   },
@@ -425,30 +393,26 @@ export async function generateFastAiGifts(
   ai: GoogleGenAI,
   prompt: string
 ): Promise<{ summaryVerdict?: string; gifts: RawAiGift[] }> {
-  const modelsToTry = [
-    { model: 'gemini-2.0-flash', thinkingLevel: ThinkingLevel.MINIMAL, timeoutMs: 11500 },
-    { model: 'gemini-2.0-flash-lite', thinkingLevel: ThinkingLevel.MINIMAL, timeoutMs: 11500 },
-    { model: 'gemini-1.5-flash', thinkingLevel: ThinkingLevel.MINIMAL, timeoutMs: 9000 },
-  ];
+  // Keep models simple and widely available — no ThinkingLevel (can crash some SDK builds)
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
 
   let lastErr: unknown = null;
 
-  for (const attempt of modelsToTry) {
+  for (const model of modelsToTry) {
     try {
       const response = await withTimeout(
         ai.models.generateContent({
-          model: attempt.model,
+          model,
           contents: prompt,
           config: {
             systemInstruction:
               'Return compact valid JSON matching the schema with 10 real gifts sold in India. Keep every string crisp and under 14 words.',
             responseMimeType: 'application/json',
             responseSchema: GIFT_RESPONSE_SCHEMA,
-            thinkingConfig: { thinkingLevel: attempt.thinkingLevel },
           },
         }),
-        attempt.timeoutMs,
-        attempt.model
+        12000,
+        model
       );
       if (response.text) {
         const parsed = extractJsonArrayOrObject(response.text);
@@ -460,9 +424,7 @@ export async function generateFastAiGifts(
       lastErr = err;
       if (isRetryableGeminiError(err)) {
         await new Promise((r) => setTimeout(r, 250));
-        continue;
       }
-      // Try next model on any failure
       continue;
     }
   }
