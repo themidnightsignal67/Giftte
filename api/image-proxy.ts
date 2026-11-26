@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { assertPublicHttpUrl, fetchImageBytesSafe } from './lib/helpers';
+import { assertPublicHttpUrl, fetchImageBytesSafe } from '../server-lib';
 
 export const config = { maxDuration: 15 };
 

@@ -2,6 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/gifts/decide.ts": {
+      "includeFiles": "server-lib.ts",
+      "maxDuration": 60
+    },
+    "api/image-proxy.ts": {
+      "includeFiles": "server-lib.ts",
+      "maxDuration": 15
+    }
+  },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
