@@ -277,31 +277,62 @@ export function buildShoppingSearchUrl(name: string, maker: string): string {
 }
 
 export function isRetryableGeminiError(err: unknown): boolean {
-  const errObj = err as { status?: number; message?: string };
-  const msg = typeof errObj?.message === 'string' ? errObj.message : '';
+  const msg = extractErrorMessage(err).toLowerCase();
+  const status = extractErrorStatus(err);
   return (
-    errObj?.status === 429 ||
-    errObj?.status === 503 ||
-    msg.includes('RESOURCE_EXHAUSTED') ||
-    msg.includes('UNAVAILABLE') ||
-    msg.includes('high demand')
+    status === 429 ||
+    status === 503 ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('unavailable') ||
+    msg.includes('high demand') ||
+    msg.includes('timed out')
   );
 }
 
 export function isRotatableKeyError(err: unknown): boolean {
-  const errObj = err as { status?: number; message?: string };
-  const msg = typeof errObj?.message === 'string' ? errObj.message : '';
+  const msg = extractErrorMessage(err).toLowerCase();
+  const status = extractErrorStatus(err);
   return (
-    errObj?.status === 401 ||
-    errObj?.status === 403 ||
-    errObj?.status === 429 ||
-    msg.includes('RESOURCE_EXHAUSTED') ||
-    msg.includes('API_KEY_INVALID') ||
-    msg.includes('API key not valid') ||
-    msg.includes('PERMISSION_DENIED') ||
+    status === 401 ||
+    status === 403 ||
+    status === 429 ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('api_key_invalid') ||
+    msg.includes('api key not valid') ||
+    msg.includes('permission_denied') ||
     msg.includes('invalid api key') ||
-    msg.toLowerCase().includes('api key')
+    msg.includes('api key')
   );
+}
+
+export function extractErrorStatus(err: unknown): number {
+  if (!err || typeof err !== 'object') return 0;
+  const e = err as { status?: number; code?: number; error?: { code?: number } };
+  if (typeof e.status === 'number') return e.status;
+  if (typeof e.code === 'number') return e.code;
+  if (typeof e.error?.code === 'number') return e.error.code;
+  return 0;
+}
+
+export function extractErrorMessage(err: unknown): string {
+  if (!err) return 'unknown error';
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) {
+    const any = err as Error & { error?: { message?: string } };
+    if (any.error?.message) return `${any.message} (${any.error.message})`;
+    return any.message || 'Error';
+  }
+  if (typeof err === 'object') {
+    const e = err as { message?: string; error?: { message?: string } };
+    if (e.error?.message) return e.error.message;
+    if (e.message) return e.message;
+    try {
+      return JSON.stringify(err).slice(0, 300);
+    } catch {
+      return 'object error';
+    }
+  }
+  return String(err);
 }
 
 export function loadGeminiApiKeys(): string[] {
@@ -330,7 +361,7 @@ export function sanitizeErrorMessage(rawMsg: string): string {
   return rawMsg
     .replace(/AQ\.[A-Za-z0-9_-]{10,}/g, '[redacted-key]')
     .replace(/AIza[A-Za-z0-9_-]{10,}/g, '[redacted-key]')
-    .slice(0, 200);
+    .slice(0, 280);
 }
 
 export const GIFT_RESPONSE_SCHEMA = {
@@ -382,7 +413,6 @@ export async function generateFastAiGifts(
   ai: GoogleGenAI,
   prompt: string
 ): Promise<{ summaryVerdict?: string; gifts: RawAiGift[] }> {
-  // Current models (Nov 2026). gemini-1.5 / 2.0 are shut down.
   const modelsToTry = [
     'gemini-3.5-flash-lite',
     'gemini-3.8-flash',
@@ -391,40 +421,61 @@ export async function generateFastAiGifts(
   ];
 
   let lastErr: unknown = null;
+  const failures: string[] = [];
 
   for (const model of modelsToTry) {
-    try {
-      const response = await withTimeout(
-        ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            systemInstruction:
-              'Return compact valid JSON matching the schema with 10 real gifts sold in India. Keep every string crisp and under 14 words.',
-            responseMimeType: 'application/json',
-            responseSchema: GIFT_RESPONSE_SCHEMA,
-          },
-        }),
-        12000,
-        model
-      );
-      if (response.text) {
-        const parsed = extractJsonArrayOrObject(response.text);
-        if (parsed.gifts.length > 0) {
-          return parsed;
+    for (const useSchema of [true, false]) {
+      try {
+        const response = await withTimeout(
+          ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: useSchema
+              ? {
+                  systemInstruction:
+                    'Return compact valid JSON matching the schema with 10 real gifts sold in India. Keep every string crisp and under 14 words.',
+                  responseMimeType: 'application/json',
+                  responseSchema: GIFT_RESPONSE_SCHEMA,
+                }
+              : {
+                  systemInstruction:
+                    'Return ONLY valid JSON: {"summaryVerdict":"...","gifts":[{"name":"","maker":"","priceInr":0,"searchQuery":"","whyItFits":"","customCardNote":""}]} with exactly 10 gifts sold in India.',
+                  responseMimeType: 'application/json',
+                },
+          }),
+          15000,
+          model
+        );
+        if (response.text) {
+          const parsed = extractJsonArrayOrObject(response.text);
+          if (parsed.gifts.length > 0) {
+            return parsed;
+          }
+          failures.push(`${model}: empty gifts`);
+        } else {
+          failures.push(`${model}: no text`);
         }
+      } catch (err) {
+        lastErr = err;
+        failures.push(`${model}: ${sanitizeErrorMessage(extractErrorMessage(err))}`);
+        if (isRetryableGeminiError(err)) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        // if schema failed, try without schema before next model
+        continue;
       }
-    } catch (err) {
-      lastErr = err;
-      if (isRetryableGeminiError(err)) {
-        await new Promise((r) => setTimeout(r, 250));
-      }
-      continue;
+      // got response but empty — try next model
+      break;
     }
   }
 
-  if (lastErr) throw lastErr;
-  return { gifts: [] };
+  const detail = failures.slice(0, 6).join(' · ');
+  if (lastErr) {
+    const e = lastErr as Error & { message?: string };
+    e.message = sanitizeErrorMessage(`${extractErrorMessage(lastErr)} | tried: ${detail}`);
+    throw e;
+  }
+  throw new Error(`No gifts generated. tried: ${detail}`);
 }
 
 export async function fetchImageBytesSafe(
